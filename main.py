@@ -171,9 +171,9 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
     signature_class_1 = classify_learn.predict(app_img)[1]
     signature_class_2 = classify_learn.predict(device_img)[1]
 
-    if(config.sig_config.classify_reponse[signature_class_1] != config.sig_config.success_case
-       and config.sig_config.classify_reponse[signature_class_2] != config.sig_config.success_case):
-        return {"status": config.sig_config.classify_reponse[signature_class_1] if config.sig_config.classify_reponse[signature_class_1] != config.sig_config.success_case else config.sig_config.classify_reponse[signature_class_2]}
+    if(config.sig_config.classify_response[signature_class_1] != config.sig_config.success_case
+       and config.sig_config.classify_response[signature_class_2] != config.sig_config.success_case):
+        return {"status": config.sig_config.classify_response[signature_class_1] if config.sig_config.classify_response[signature_class_1] != config.sig_config.success_case else config.sig_config.classify_response[signature_class_2]}
 
     app_emb = compute_feature(app_img, similarity_learn, embedding_layer)
     device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
@@ -189,7 +189,7 @@ async def signature_compute(file: UploadFile = File(...)):
 
     signature_class = classify_learn.predict(device_img)[1]
 
-    return {"status": config.sig_config.classify_reponse[signature_class]}
+    return {"status": config.sig_config.classify_response[signature_class]}
 
 
 @app.get("/")

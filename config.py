@@ -7,7 +7,7 @@ sig_config = dict(
     model_path='',
     similarity_model_name='',
     classify_model_name='',
-    classify_reponse={'0': 'Not Receive', '1': 'Complete'},
+    classify_response={'0': 'Not Receive', '1': 'Complete'},
     success_case='Complete',
     fail_case='Incomplete'
 )
