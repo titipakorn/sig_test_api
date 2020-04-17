@@ -180,7 +180,7 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
 
     similarity_score = vector_distance(app_emb, device_emb)
 
-    return {"status": config.sig_config.success_case if similarity_score < config.sig_config.threshold else config.sig_config.fail_case}
+    return {"status": config.sig_config.success_case if similarity_score < config.sig_config.threshold else config.sig_config.fail_case, "similarity": similarity_score}
 
 
 @app.post("/check_signature/")
