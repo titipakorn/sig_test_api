@@ -108,9 +108,9 @@ app = FastAPI()
 config = read_py_config('config.py')
 
 similarity_learn = load_learner(
-    config.sig_config.model_path, config.sig_config.similarity_model_name)
+    config['sig_config'].model_path, config['sig_config'].similarity_model_name)
 classify_learn = load_learner(
-    config.sig_config.model_path, config.sig_config.classify_model_name)
+    config['sig_config'].model_path, config['sig_config'].classify_model_name)
 embedding_layer = similarity_learn.model[1][-2]
 
 
@@ -171,16 +171,16 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
     signature_class_1 = classify_learn.predict(app_img)[1]
     signature_class_2 = classify_learn.predict(device_img)[1]
 
-    if(config.sig_config.classify_response[signature_class_1] != config.sig_config.success_case
-       and config.sig_config.classify_response[signature_class_2] != config.sig_config.success_case):
-        return {"status": config.sig_config.classify_response[signature_class_1] if config.sig_config.classify_response[signature_class_1] != config.sig_config.success_case else config.sig_config.classify_response[signature_class_2]}
+    if(config['sig_config'].classify_response[signature_class_1] != config['sig_config'].success_case
+       and config['sig_config'].classify_response[signature_class_2] != config['sig_config'].success_case):
+        return {"status": config['sig_config'].classify_response[signature_class_1] if config['sig_config'].classify_response[signature_class_1] != config['sig_config'].success_case else config['sig_config'].classify_response[signature_class_2]}
 
     app_emb = compute_feature(app_img, similarity_learn, embedding_layer)
     device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
 
     similarity_score = vector_distance(app_emb, device_emb)
 
-    return {"status": config.sig_config.success_case if similarity_score < config.sig_config.threshold else config.sig_config.fail_case, "similarity": similarity_score}
+    return {"status": config['sig_config'].success_case if similarity_score < config['sig_config'].threshold else config['sig_config'].fail_case, "similarity": similarity_score}
 
 
 @app.post("/check_signature/")
@@ -189,7 +189,7 @@ async def signature_compute(file: UploadFile = File(...)):
 
     signature_class = classify_learn.predict(device_img)[1]
 
-    return {"status": config.sig_config.classify_response[signature_class]}
+    return {"status": config['sig_config'].classify_response[signature_class]}
 
 
 @app.get("/")
