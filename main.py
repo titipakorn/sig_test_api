@@ -110,11 +110,11 @@ class NormSoftmaxLoss(nn.Module):
 app = FastAPI()
 config = read_py_config('config.py')
 print('MY CONFIG', config)
-# similarity_learn = load_learner(
-#     config['sig_config']['model_path'], config['sig_config']['similarity_model_name'])
+similarity_learn = load_learner(
+    config['sig_config']['model_path'], config['sig_config']['similarity_model_name'])
 classify_learn = load_learner(
     config['sig_config']['model_path'], config['sig_config']['classify_model_name'])
-# embedding_layer = similarity_learn.model[1][-2]
+embedding_layer = similarity_learn.model[1][-2]
 
 
 def extract_signature(file, device):
@@ -189,7 +189,7 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
 
     similarity_score = vector_distance(app_emb, device_emb)
 
-    return {"status": config['sig_config']['success_case'] if similarity_score < config['sig_config']['threshold'] else config['sig_config']['fail_case'], "similarity": similarity_score}
+    return {"status": config['sig_config']['success_case'] if similarity_score < config['sig_config']['threshold'] else config['sig_config']['fail_case'], "similarity": str(similarity_score)}
 
 
 @app.post("/check_signature/")
