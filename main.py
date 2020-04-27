@@ -120,7 +120,7 @@ classify_learn = load_learner(
 def extract_signature(file, device):
     header_offset = device and 3000 or 2200
     footer_offset = device and 3151 or 2305
-    pages = convert_from_bytes(file)
+    pages = convert_from_bytes(file.read())
     for page in pages:
         h_o = device and (page.width/2)+171 or (page.width/2)+550
         f_o = device and (page.width/2)+171+707 or (page.width/2)+550+370
