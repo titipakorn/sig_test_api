@@ -32,8 +32,11 @@ from fastai.vision import (
     imagenet_stats,
     models,
     open_image,
-    load_learner
+    load_learner,
+    image,
+    pil2tensor
 )
+
 
 # Computer Vision repository
 sys.path.extend([".", "../.."])  # to access the utils_cv library
@@ -155,32 +158,36 @@ def center_image(pil_image):
         deltah = desired_size[1]-old_size[0]
         ltrb_border = (deltaw//2, deltah//2, deltaw -
                        (deltaw//2), deltah-(deltah//2))
-        new_im = ImageOps.expand(old_image, border=ltrb_border, fill='white')
+        new_img = ImageOps.expand(old_image, border=ltrb_border, fill='white')
         return new_img
     except:
-        new_im = Image.fromarray(thresh_gray)
+        new_img = Image.fromarray(thresh_gray)
         return new_img
 
 
-# @app.post("/compare_signature/")
-# async def signature_compute(app: UploadFile = File(...), device: UploadFile = File(...)):
+@app.post("/compare_signature/")
+async def signature_compute(app: UploadFile = File(...), device: UploadFile = File(...)):
 
-#     app_img = center_image(extract_signature(app, False))
-#     device_img = center_image(extract_signature(device, True))
+    app_img = center_image(extract_signature(app.file, False))
+    device_img = center_image(extract_signature(device.file, True))
 
-#     signature_class_1 = classify_learn.predict(app_img)[1]
-#     signature_class_2 = classify_learn.predict(device_img)[1]
+    app_img = image.Image(pil2tensor(app_img, dtype=np.float32).div_(255))
+    device_img = image.Image(pil2tensor(
+        device_img, dtype=np.float32).div_(255))
 
-#     if(config['sig_config']['classify_response'][signature_class_1] != config['sig_config']['success_case']
-#        and config['sig_config']['classify_response'][signature_class_2] != config['sig_config']['success_case']):
-#         return {"status": config['sig_config']['classify_response'][signature_class_1] if config['sig_config']['classify_response'][signature_class_1] != config['sig_config']['success_case'] else config['sig_config']['classify_response'][signature_class_2]}
+    signature_class_1 = classify_learn.predict(app_img)[1]
+    signature_class_2 = classify_learn.predict(device_img)[1]
 
-#     app_emb = compute_feature(app_img, similarity_learn, embedding_layer)
-#     device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
+    if(config['sig_config']['classify_response'][signature_class_1] != config['sig_config']['success_case']
+       and config['sig_config']['classify_response'][signature_class_2] != config['sig_config']['success_case']):
+        return {"status": config['sig_config']['classify_response'][signature_class_1] if config['sig_config']['classify_response'][signature_class_1] != config['sig_config']['success_case'] else config['sig_config']['classify_response'][signature_class_2]}
 
-#     similarity_score = vector_distance(app_emb, device_emb)
+    app_emb = compute_feature(app_img, similarity_learn, embedding_layer)
+    device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
 
-#     return {"status": config['sig_config']['success_case'] if similarity_score < config['sig_config']['threshold'] else config['sig_config']['fail_case'], "similarity": similarity_score}
+    similarity_score = vector_distance(app_emb, device_emb)
+
+    return {"status": config['sig_config']['success_case'] if similarity_score < config['sig_config']['threshold'] else config['sig_config']['fail_case'], "similarity": similarity_score}
 
 
 @app.post("/check_signature/")
@@ -189,7 +196,7 @@ async def signature_compute(file: UploadFile = File(...)):
 
     signature_class = classify_learn.predict(device_img)[1]
 
-    return {"status": config['sig_config']['classify_response'][signature_class]}
+    return {"status": config['sig_config']['classify_response'][str(signature_class.item())]}
 
 
 @app.get("/")
