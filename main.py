@@ -176,7 +176,9 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
         device_img, dtype=np.float32).div_(255))
 
     signature_class_1 = classify_learn.predict(app_img)[1]
+    signature_class_1 = str(signature_class_1.item())
     signature_class_2 = classify_learn.predict(device_img)[1]
+    signature_class_2 = str(signature_class_2.item())
 
     if(config['sig_config']['classify_response'][signature_class_1] != config['sig_config']['success_case']
        and config['sig_config']['classify_response'][signature_class_2] != config['sig_config']['success_case']):
