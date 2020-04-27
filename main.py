@@ -188,7 +188,7 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
     device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
 
     similarity_score = vector_distance(app_emb, device_emb)
-
+    print(similarity_score, app_img, device_img, app_emb, device_emb)
     return {"status": config['sig_config']['success_case'] if similarity_score < config['sig_config']['threshold'] else config['sig_config']['fail_case'], "similarity": str(similarity_score)}
 
 
