@@ -197,8 +197,9 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
 @app.post("/check_signature/")
 async def signature_compute(file: UploadFile = File(...)):
     device_img = open_image(file.file)
-
-    signature_class = classify_learn.predict(device_img)[1]
+    classify_result = classify_learn.predict(device_img)
+    signature_class = classify_result[1]
+    print(classify_result)
 
     return {"status": config['sig_config']['classify_response'][str(signature_class.item())]}
 
