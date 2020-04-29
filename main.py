@@ -168,12 +168,14 @@ def center_image(pil_image):
 @app.post("/compare_signature/")
 async def signature_compute(app: UploadFile = File(...), device: UploadFile = File(...)):
 
-    app_img = center_image(extract_signature(app.file, False))
-    device_img = center_image(extract_signature(device.file, True))
+    # app_img = center_image(extract_signature(app.file, False))
+    # device_img = center_image(extract_signature(device.file, True))
 
-    app_img = image.Image(pil2tensor(app_img, dtype=np.float32).div_(255))
-    device_img = image.Image(pil2tensor(
-        device_img, dtype=np.float32).div_(255))
+    # app_img = image.Image(pil2tensor(app_img, dtype=np.float32).div_(255))
+    # device_img = image.Image(pil2tensor(
+    #     device_img, dtype=np.float32).div_(255))
+    app_img = open_image(app.file)
+    device_img = open_image(device.file)
 
     signature_class_1 = classify_learn.predict(app_img)[1]
     signature_class_1 = str(signature_class_1.item())
