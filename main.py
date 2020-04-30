@@ -184,16 +184,23 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
     signature_class_2 = classify_learn.predict(device_img)[1]
     signature_class_2 = str(signature_class_2.item())
 
-    if(config['sig_config']['classify_response'][signature_class_1] != config['sig_config']['success_case']
-       and config['sig_config']['classify_response'][signature_class_2] != config['sig_config']['success_case']):
-        return {"status": config['sig_config']['classify_response'][signature_class_1] if config['sig_config']['classify_response'][signature_class_1] != config['sig_config']['success_case'] else config['sig_config']['classify_response'][signature_class_2]}
+    if(config['sig_config']['similarity_response'][signature_class_1] != config['sig_config']['success_case']
+       and config['sig_config']['similarity_response'][signature_class_2] != config['sig_config']['success_case']):
+        return {"status": config['sig_config']['similarity_response'][signature_class_1] if config['sig_config']['similarity_response'][signature_class_1] != config['sig_config']['success_case'] else config['sig_config']['similarity_response'][signature_class_2]}
 
     app_emb = compute_feature(app_img, similarity_learn, embedding_layer)
     device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
 
     similarity_score = vector_distance(app_emb, device_emb)
-    #print(similarity_score, app_img, device_img, app_emb, device_emb)
-    return {"status": config['sig_config']['success_case'] if similarity_score < config['sig_config']['threshold'] else config['sig_config']['fail_case'], "similarity": str(similarity_score)}
+    result = ""
+    if similarity_score <= config['sig_config']['accept_threshold']:
+        result = config['sig_config']['success_case']
+    elif similarity_score >= config['sig_config']['deny_threshold']:
+        result = config['sig_config']['fail_case']
+    else:
+        result = config['sig_config']['unknown_case']
+
+    return {"status": result, "similarity": str(similarity_score)}
 
 
 @app.post("/check_signature/")
