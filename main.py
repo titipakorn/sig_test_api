@@ -19,7 +19,7 @@ import cv2
 from typing import List
 
 from fastapi import FastAPI, File, UploadFile
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, StreamingResponse
 from pdf2image import convert_from_bytes
 
 # Fast.ai
@@ -36,6 +36,8 @@ from fastai.vision import (
     image,
     pil2tensor
 )
+
+import io
 
 
 # Computer Vision repository
@@ -190,7 +192,7 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
     device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
 
     similarity_score = vector_distance(app_emb, device_emb)
-    print(similarity_score, app_img, device_img, app_emb, device_emb)
+    #print(similarity_score, app_img, device_img, app_emb, device_emb)
     return {"status": config['sig_config']['success_case'] if similarity_score < config['sig_config']['threshold'] else config['sig_config']['fail_case'], "similarity": str(similarity_score)}
 
 
@@ -199,9 +201,22 @@ async def signature_compute(file: UploadFile = File(...)):
     device_img = open_image(file.file)
     classify_result = classify_learn.predict(device_img)
     signature_class = classify_result[1]
-    print(classify_result)
+    # print(classify_result)
 
     return {"status": config['sig_config']['classify_response'][str(signature_class.item())]}
+
+
+@app.post("/extract_signature")
+def image_endpoint(device: int, file: UploadFile = File(...)):
+    # Returns a cv2 image array from the document vector
+    if(device > 0):
+        device = True
+    else:
+        device = False
+    vector = center_image(extract_signature(file.file, device))
+    cv2img = np.array(vector)
+    res, im_png = cv2.imencode(".jpg", cv2img)
+    return StreamingResponse(io.BytesIO(im_png.tobytes()), media_type="image/jpg")
 
 
 @app.get("/")

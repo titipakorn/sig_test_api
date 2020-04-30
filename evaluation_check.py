@@ -1,7 +1,6 @@
 import requests
 import os
 import csv
-import json
 path = '/data1/CIM/Test_API/check/'
 
 with open('check_signature.csv', mode='w') as compare_result_file:
@@ -12,5 +11,5 @@ with open('check_signature.csv', mode='w') as compare_result_file:
         files.append(('file', open(path+file, 'rb')))
         r = requests.post(
             'http://localhost:6666/check_signature/', files=files)
-        data = json.loads(r.json())
-        csv_writer.writerow([file, data.status])
+        data = r.json()
+        csv_writer.writerow([file, data['status'])
