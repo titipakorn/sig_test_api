@@ -14,5 +14,17 @@ sig_config = dict(
                        '1': 'OTP', '2': 'OTP_MNP', '3': 'Signature'},
     success_case='Complete',
     unknown_case='Unknown',
-    fail_case='Incomplete'
+    fail_case='Incomplete',
+    app={
+        'start_width': 1194,
+        'end_width': 1444,
+        'start_height': 1422,
+        'end_height': 1540,
+    },
+    device={
+        'start_width': 950,
+        'end_width': 1400,
+        'start_height': 2000,
+        'end_height': 2090,
+    }
 )

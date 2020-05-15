@@ -18,9 +18,10 @@ from PIL import ImageOps, Image
 import cv2
 from typing import List
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, Body
 from starlette.responses import HTMLResponse, StreamingResponse
 from pdf2image import convert_from_bytes
+import time
 
 # Fast.ai
 import fastai
@@ -120,13 +121,12 @@ embedding_layer = similarity_learn.model[1][-2]
 
 
 def extract_signature(file, device):
-    header_offset = device and 3000 or 2200
-    footer_offset = device and 3151 or 2305
+    start_time = time.time()
+    offset = device and config['sig_config']['device'] or config['sig_config']['app']
     pages = convert_from_bytes(file.read())
     for page in pages:
-        h_o = device and (page.width/2)+171 or (page.width/2)+550
-        f_o = device and (page.width/2)+171+707 or (page.width/2)+550+370
-        page = page.crop((h_o, header_offset, f_o, footer_offset))
+        page = page.crop((offset['start_width'], offset['start_height'],
+                          offset['end_width'], offset['end_height']))
         return page
 
 
@@ -147,7 +147,7 @@ def center_image(pil_image):
     points = np.fliplr(points)
     # create a rectangle around those points
     x, y, w, h = cv2.boundingRect(points)
-    crop = gray[y:y+h, x:x+w]  # create a cropped region of the gray image
+    crop = gray[y:y + h, x:x + w]  # create a cropped region of the gray image
     try:
         retval, thresh_crop = cv2.threshold(
             crop, thresh=200, maxval=255, type=cv2.THRESH_BINARY)
@@ -156,10 +156,10 @@ def center_image(pil_image):
         old_size = thresh_crop.shape[:2]
 
         old_image = Image.fromarray(thresh_crop)
-        deltaw = desired_size[0]-old_size[1]
-        deltah = desired_size[1]-old_size[0]
-        ltrb_border = (deltaw//2, deltah//2, deltaw -
-                       (deltaw//2), deltah-(deltah//2))
+        deltaw = desired_size[0] - old_size[1]
+        deltah = desired_size[1] - old_size[0]
+        ltrb_border = (deltaw // 2, deltah // 2, deltaw -
+                       (deltaw // 2), deltah - (deltah // 2))
         new_img = ImageOps.expand(old_image, border=ltrb_border, fill='white')
         return new_img
     except:
@@ -167,62 +167,101 @@ def center_image(pil_image):
         return new_img
 
 
+def compare_sig(app_img, device_img):
+    start_time = time.time()
+    signature_class_1 = None
+    signature_class_2 = None
+    if app_img:
+        signature_class_1 = classify_learn.predict(app_img)[1]
+        signature_class_1 = str(signature_class_1.item())
+    if device_img:
+        signature_class_2 = classify_learn.predict(device_img)[1]
+        signature_class_2 = str(signature_class_2.item())
+    result = ""
+    similarity_score = -1
+    if(app_img and device_img):
+        if(config['sig_config']['similarity_response'][signature_class_1] != config['sig_config']['success_case']
+           and config['sig_config']['similarity_response'][signature_class_2] != config['sig_config']['success_case']):
+            result = config['sig_config']['similarity_response'][signature_class_1] if config['sig_config']['similarity_response'][
+                signature_class_1] != config['sig_config']['success_case'] else config['sig_config']['similarity_response'][signature_class_2]
+        if(result == ""):
+            app_emb = compute_feature(
+                app_img, similarity_learn, embedding_layer)
+            device_emb = compute_feature(
+                device_img, similarity_learn, embedding_layer)
+            similarity_score = vector_distance(app_emb, device_emb)
+            if similarity_score <= config['sig_config']['accept_threshold']:
+                result = config['sig_config']['success_case']
+            elif similarity_score >= config['sig_config']['deny_threshold']:
+                result = config['sig_config']['fail_case']
+            else:
+                result = config['sig_config']['unknown_case']
+    elif app_img or device_img:
+        result = app_img and config['sig_config']['similarity_response'][
+            signature_class_1] or config['sig_config']['similarity_response'][signature_class_2]
+    else:
+        return {"status": "error", 'description': "no files"}
+    print("compare signature  --- %s seconds ---" % (time.time() - start_time))
+    return {"status": result, "similarity": str(similarity_score), "app_class": signature_class_1 and config['sig_config']['classify_response'][signature_class_1] or "", "device_class": signature_class_2 and config['sig_config']['classify_response'][signature_class_2] or ""}
+
+
 @app.post("/compare_signature/")
 async def signature_compute(app: UploadFile = File(...), device: UploadFile = File(...)):
+    try:
+        app_img = open_image(app.file)
+    except:
+        app_img = None
+    try:
+        device_img = open_image(device.file)
+    except:
+        device_img = None
+    return compare_sig(app_img, device_img)
 
-    # app_img = center_image(extract_signature(app.file, False))
-    # device_img = center_image(extract_signature(device.file, True))
 
-    # app_img = image.Image(pil2tensor(app_img, dtype=np.float32).div_(255))
-    # device_img = image.Image(pil2tensor(
-    #     device_img, dtype=np.float32).div_(255))
-    app_img = open_image(app.file)
-    device_img = open_image(device.file)
-
-    signature_class_1 = classify_learn.predict(app_img)[1]
-    signature_class_1 = str(signature_class_1.item())
-    signature_class_2 = classify_learn.predict(device_img)[1]
-    signature_class_2 = str(signature_class_2.item())
-
-    if(config['sig_config']['similarity_response'][signature_class_1] != config['sig_config']['success_case']
-       and config['sig_config']['similarity_response'][signature_class_2] != config['sig_config']['success_case']):
-        return {"status": config['sig_config']['similarity_response'][signature_class_1] if config['sig_config']['similarity_response'][signature_class_1] != config['sig_config']['success_case'] else config['sig_config']['similarity_response'][signature_class_2]}
-
-    app_emb = compute_feature(app_img, similarity_learn, embedding_layer)
-    device_emb = compute_feature(device_img, similarity_learn, embedding_layer)
-
-    similarity_score = vector_distance(app_emb, device_emb)
-    result = ""
-    if similarity_score <= config['sig_config']['accept_threshold']:
-        result = config['sig_config']['success_case']
-    elif similarity_score >= config['sig_config']['deny_threshold']:
-        result = config['sig_config']['fail_case']
-    else:
-        result = config['sig_config']['unknown_case']
-
-    return {"status": result, "similarity": str(similarity_score)}
+@app.post("/compare_signature_pdf/")
+async def signature_compute(app: UploadFile = File(...), device: UploadFile = File(...)):
+    try:
+        app_img = center_image(extract_signature(app.file, False))
+        cv2img = np.array(app_img)
+        res, im_png = cv2.imencode(".jpg", cv2img)
+        app_img = open_image(io.BytesIO(im_png.tobytes()))
+    except:
+        app_img = None
+    try:
+        device_img = center_image(extract_signature(device.file, True))
+        cv2img = np.array(device_img)
+        res, im_png = cv2.imencode(".jpg", cv2img)
+        device_img = open_image(io.BytesIO(im_png.tobytes()))
+    except:
+        device_img = None
+    return compare_sig(app_img, device_img)
 
 
 @app.post("/check_signature/")
 async def signature_compute(file: UploadFile = File(...)):
+    start_time = time.time()
     device_img = open_image(file.file)
     classify_result = classify_learn.predict(device_img)
     signature_class = classify_result[1]
-    # print(classify_result)
+    print("classify signature  --- %s seconds ---" %
+          (time.time() - start_time))
 
     return {"status": config['sig_config']['classify_response'][str(signature_class.item())]}
 
 
 @app.post("/extract_signature")
-def image_endpoint(device: int, file: UploadFile = File(...)):
+def image_endpoint(device: int = Body(...), file: UploadFile = File(...)):
     # Returns a cv2 image array from the document vector
+    start_time = time.time()
     if(device > 0):
         device = True
     else:
         device = False
-    vector = center_image(extract_signature(file.file, device))
+    ex_sig = extract_signature(file.file, device)
+    vector = center_image(ex_sig)
     cv2img = np.array(vector)
     res, im_png = cv2.imencode(".jpg", cv2img)
+    print("extract signature  --- %s seconds ---" % (time.time() - start_time))
     return StreamingResponse(io.BytesIO(im_png.tobytes()), media_type="image/jpg")
 
 
