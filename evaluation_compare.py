@@ -22,5 +22,9 @@ with open('compare_result_signature.csv', mode='w') as compare_result_file:
         r = requests.post(
             'http://localhost:6666/compare_signature/', files=files)
         data = r.json()
-        csv_writer.writerow(
-            [file, data['status'], data['similarity'], data['app_class'], data['device_class']])
+        if(data['status'] != "error"):
+            csv_writer.writerow(
+                [file, data['status'], data['similarity'], data['app_class'], data['device_class']])
+        else:
+            csv_writer.writerow(
+                [file, data['status'], '', '', ''])
