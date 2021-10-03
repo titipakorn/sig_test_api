@@ -15,6 +15,7 @@ import torch.nn as nn
 from IPython.core.debugger import set_trace
 from PIL import ImageOps, Image
 import cv2
+import pickle
 from typing import List
 from torch.nn import Module
 from torch import Tensor
@@ -36,10 +37,13 @@ from fastai.vision import (
     open_image,
     load_learner,
     image,
-    pil2tensor
+    pil2tensor,
 )
 
 import io
+
+with open("classify_model.pkl", "rb") as fp:
+    classify_model = pickle.load(fp)
 
 
 class SaveFeatures:
@@ -108,7 +112,7 @@ class L2NormalizedLinearLayer(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(L2NormalizedLinearLayer, self).__init__()
         self.weight = nn.Parameter(torch.Tensor(output_dim, input_dim))
-        stdv = 1. / math.sqrt(self.weight.size(1))
+        stdv = 1.0 / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
         # Initialization from nn.Linear (https://github.com/pytorch/pytorch/blob/v1.0.0/torch/nn/modules/linear.py#L129)
 
@@ -129,29 +133,25 @@ class NormSoftmaxLoss(nn.Module):
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, prediction_logits, instance_targets):
-        loss = self.loss_fn(prediction_logits /
-                            self.temperature, instance_targets)
+        loss = self.loss_fn(prediction_logits / self.temperature, instance_targets)
         return loss
 
 
 app = FastAPI()
-config = read_py_config('config.py')
-print('MY CONFIG', config)
-similarity_learn = load_learner(
-    config['sig_config']['model_path'], config['sig_config']['similarity_model_name'])
-classify_learn = load_learner(
-    config['sig_config']['model_path'], config['sig_config']['classify_model_name'])
+config = read_py_config("config.py")
+print("MY CONFIG", config)
+similarity_learn = load_learner(config["sig_config"]["model_path"], config["sig_config"]["similarity_model_name"])
+classify_learn = load_learner(config["sig_config"]["model_path"], config["sig_config"]["classify_model_name"])
 embedding_layer = similarity_learn.model[1][-2]
 featurizer = SaveFeatures(embedding_layer)
 
 
 def extract_signature(file, device):
     start_time = time.time()
-    offset = device and config['sig_config']['device'] or config['sig_config']['app']
+    offset = device and config["sig_config"]["device"] or config["sig_config"]["app"]
     pages = convert_from_bytes(file.read())
     for page in pages:
-        page = page.crop((offset['start_width'], offset['start_height'],
-                          offset['end_width'], offset['end_height']))
+        page = page.crop((offset["start_width"], offset["start_height"], offset["end_width"], offset["end_height"]))
         return page
 
 
@@ -164,18 +164,16 @@ def center_image(pil_image):
 
     # new_size should be in (width, height) format
 
-    retval, thresh_gray = cv2.threshold(
-        gray, thresh=100, maxval=255, type=cv2.THRESH_BINARY)
+    retval, thresh_gray = cv2.threshold(gray, thresh=100, maxval=255, type=cv2.THRESH_BINARY)
     # find where the signature is and make a cropped region
     points = np.argwhere(thresh_gray == 0)  # find where the black pixels are
     # store them in x,y coordinates instead of row,col indices
     points = np.fliplr(points)
     # create a rectangle around those points
     x, y, w, h = cv2.boundingRect(points)
-    crop = gray[y:y + h, x:x + w]  # create a cropped region of the gray image
+    crop = gray[y : y + h, x : x + w]  # create a cropped region of the gray image
     try:
-        retval, thresh_crop = cv2.threshold(
-            crop, thresh=200, maxval=255, type=cv2.THRESH_BINARY)
+        retval, thresh_crop = cv2.threshold(crop, thresh=200, maxval=255, type=cv2.THRESH_BINARY)
 
         # old_size is in (height, width) format
         old_size = thresh_crop.shape[:2]
@@ -183,9 +181,8 @@ def center_image(pil_image):
         old_image = Image.fromarray(thresh_crop)
         deltaw = desired_size[0] - old_size[1]
         deltah = desired_size[1] - old_size[0]
-        ltrb_border = (deltaw // 2, deltah // 2, deltaw -
-                       (deltaw // 2), deltah - (deltah // 2))
-        new_img = ImageOps.expand(old_image, border=ltrb_border, fill='white')
+        ltrb_border = (deltaw // 2, deltah // 2, deltaw - (deltaw // 2), deltah - (deltah // 2))
+        new_img = ImageOps.expand(old_image, border=ltrb_border, fill="white")
         return new_img
     except:
         new_img = Image.fromarray(thresh_gray)
@@ -204,12 +201,18 @@ def compare_sig(app_img, device_img):
         signature_class_2 = str(signature_class_2.item())
     result = ""
     similarity_score = -1
-    if(app_img and device_img):
-        if(config['sig_config']['similarity_response'][signature_class_1] != config['sig_config']['success_case']
-           and config['sig_config']['similarity_response'][signature_class_2] != config['sig_config']['success_case']):
-            result = config['sig_config']['similarity_response'][signature_class_1] if config['sig_config']['similarity_response'][
-                signature_class_1] != config['sig_config']['success_case'] else config['sig_config']['similarity_response'][signature_class_2]
-        if(result == ""):
+    if app_img and device_img:
+        if (
+            config["sig_config"]["similarity_response"][signature_class_1] != config["sig_config"]["success_case"]
+            and config["sig_config"]["similarity_response"][signature_class_2] != config["sig_config"]["success_case"]
+        ):
+            result = (
+                config["sig_config"]["similarity_response"][signature_class_1]
+                if config["sig_config"]["similarity_response"][signature_class_1]
+                != config["sig_config"]["success_case"]
+                else config["sig_config"]["similarity_response"][signature_class_2]
+            )
+        if result == "":
             featurizer.features = None
             similarity_learn.predict(app_img)
             app_emb = featurizer.features[0][:]
@@ -220,19 +223,27 @@ def compare_sig(app_img, device_img):
             assert len(device_emb) > 1
             featurizer.features = None
             similarity_score = vector_distance(app_emb, device_emb)
-            if similarity_score <= config['sig_config']['accept_threshold']:
-                result = config['sig_config']['success_case']
-            elif similarity_score >= config['sig_config']['deny_threshold']:
-                result = config['sig_config']['fail_case']
+            if similarity_score <= config["sig_config"]["accept_threshold"]:
+                result = config["sig_config"]["success_case"]
+            elif similarity_score >= config["sig_config"]["deny_threshold"]:
+                result = config["sig_config"]["fail_case"]
             else:
-                result = config['sig_config']['unknown_case']
+                result = config["sig_config"]["unknown_case"]
     elif app_img or device_img:
-        result = app_img and config['sig_config']['similarity_response'][
-            signature_class_1] or config['sig_config']['similarity_response'][signature_class_2]
+        result = (
+            app_img
+            and config["sig_config"]["similarity_response"][signature_class_1]
+            or config["sig_config"]["similarity_response"][signature_class_2]
+        )
     else:
-        return {"status": "error", 'description': "no files"}
+        return {"status": "error", "description": "no files"}
     print("compare signature  --- %s seconds ---" % (time.time() - start_time))
-    return {"status": result, "similarity": str(similarity_score), "app_class": signature_class_1 and config['sig_config']['classify_response'][signature_class_1] or "", "device_class": signature_class_2 and config['sig_config']['classify_response'][signature_class_2] or ""}
+    return {
+        "status": result,
+        "similarity": str(similarity_score),
+        "app_class": signature_class_1 and config["sig_config"]["classify_response"][signature_class_1] or "",
+        "device_class": signature_class_2 and config["sig_config"]["classify_response"][signature_class_2] or "",
+    }
 
 
 @app.post("/compare_signature/")
@@ -276,21 +287,22 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
 @app.post("/check_signature/")
 async def signature_compute(file: UploadFile = File(...)):
     start_time = time.time()
-    device_img = open_image(file.file)
-    classify_result = classify_learn.predict(device_img)
-    signature_class = classify_result[1]
-    print("classify signature  --- %s seconds ---" %
-          (time.time() - start_time))
+    img = cv2.imdecode(np.fromstring(file.file.read(), np.uint8), cv2.IMREAD_UNCHANGED)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = (img > 128) * 255
+    number_of_white_pix = np.sum(img == 255)
+    number_of_black_pix = np.sum(img == 0)
+    response = classify_model.predict([[number_of_white_pix, number_of_black_pix, number_of_black_pix / len(img)]])
+    print("classify signature  --- %s seconds ---" % (time.time() - start_time))
     file.file.close()
-
-    return {"status": config['sig_config']['classify_response'][str(signature_class.item())]}
+    return {"status": response[0]}
 
 
 @app.post("/extract_signature")
 def image_endpoint(device: int = Body(...), file: UploadFile = File(...)):
     # Returns a cv2 image array from the document vector
     start_time = time.time()
-    if(device > 0):
+    if device > 0:
         device = True
     else:
         device = False
