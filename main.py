@@ -155,6 +155,17 @@ def extract_signature(file, device):
         return page
 
 
+def classify_image(img):
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = (img > 128) * 255
+    kernel = np.ones((config["thicker_kernel"], config["thicker_kernel"]), np.uint8)
+    img = np.uint8(img)
+    erosion = cv2.erode(img, kernel, iterations=1)
+    number_of_white_pix = np.sum(erosion == 255)
+    number_of_black_pix = np.sum(erosion == 0)
+    return classify_model.predict([[number_of_white_pix, number_of_black_pix, number_of_black_pix / len(img)]])
+
+
 def center_image(pil_image):
     img = np.array(pil_image)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # convert to grayscale
@@ -194,11 +205,13 @@ def compare_sig(app_img, device_img):
     signature_class_1 = None
     signature_class_2 = None
     if app_img:
-        signature_class_1 = classify_learn.predict(app_img)[1]
-        signature_class_1 = str(signature_class_1.item())
+        signature_class_1 = classify_image(app_img)
+        # signature_class_1 = classify_learn.predict(app_img)[1]
+        # signature_class_1 = str(signature_class_1.item())
     if device_img:
-        signature_class_2 = classify_learn.predict(device_img)[1]
-        signature_class_2 = str(signature_class_2.item())
+        signature_class_2 = classify_image(device_img)
+        # signature_class_2 = classify_learn.predict(device_img)[1]
+        # signature_class_2 = str(signature_class_2.item())
     result = ""
     similarity_score = -1
     if app_img and device_img:
@@ -249,11 +262,13 @@ def compare_sig(app_img, device_img):
 @app.post("/compare_signature/")
 async def signature_compute(app: UploadFile = File(...), device: UploadFile = File(...)):
     try:
-        app_img = open_image(app.file)
+        app_img = cv2.imdecode(np.fromstring(app.file.read(), np.uint8), cv2.IMREAD_UNCHANGED)
+        # app_img = open_image(app.file)
     except:
         app_img = None
     try:
-        device_img = open_image(device.file)
+        device_img = cv2.imdecode(np.fromstring(device.file.read(), np.uint8), cv2.IMREAD_UNCHANGED)
+        # device_img = open_image(device.file)
     except:
         device_img = None
     result = compare_sig(app_img, device_img)
@@ -266,16 +281,16 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
 async def signature_compute(app: UploadFile = File(...), device: UploadFile = File(...)):
     try:
         app_img = center_image(extract_signature(app.file, False))
-        cv2img = np.array(app_img)
-        res, im_png = cv2.imencode(".jpg", cv2img)
-        app_img = open_image(io.BytesIO(im_png.tobytes()))
+        app_img = np.array(app_img)
+        # res, im_png = cv2.imencode(".jpg", cv2img)
+        # app_img = open_image(io.BytesIO(im_png.tobytes()))
     except:
         app_img = None
     try:
         device_img = center_image(extract_signature(device.file, True))
-        cv2img = np.array(device_img)
-        res, im_png = cv2.imencode(".jpg", cv2img)
-        device_img = open_image(io.BytesIO(im_png.tobytes()))
+        device_img = np.array(device_img)
+        # res, im_png = cv2.imencode(".jpg", cv2img)
+        # device_img = open_image(io.BytesIO(im_png.tobytes()))
     except:
         device_img = None
     result = compare_sig(app_img, device_img)
@@ -288,12 +303,7 @@ async def signature_compute(app: UploadFile = File(...), device: UploadFile = Fi
 async def signature_compute(file: UploadFile = File(...)):
     start_time = time.time()
     img = cv2.imdecode(np.fromstring(file.file.read(), np.uint8), cv2.IMREAD_UNCHANGED)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = (img > 128) * 255
-    number_of_white_pix = np.sum(img == 255)
-    number_of_black_pix = np.sum(img == 0)
-    response = classify_model.predict([[number_of_white_pix, number_of_black_pix, number_of_black_pix / len(img)]])
-    print("classify signature  --- %s seconds ---" % (time.time() - start_time))
+    response = classify_image(img)
     file.file.close()
     return {"status": response[0]}
 
