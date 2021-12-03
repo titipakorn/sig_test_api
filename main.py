@@ -42,6 +42,7 @@ from fastai.vision import (
 
 import io
 
+NoneType = type(None)
 with open("classify_model.pkl", "rb") as fp:
     classify_model = pickle.load(fp)
 
@@ -204,17 +205,17 @@ def compare_sig(app_img, device_img):
     start_time = time.time()
     signature_class_1 = None
     signature_class_2 = None
-    if app_img:
+    if isinstance(app_img, NoneType):
         signature_class_1 = classify_image(app_img)
         # signature_class_1 = classify_learn.predict(app_img)[1]
         # signature_class_1 = str(signature_class_1.item())
-    if device_img:
+    if isinstance(device_img, NoneType):
         signature_class_2 = classify_image(device_img)
         # signature_class_2 = classify_learn.predict(device_img)[1]
         # signature_class_2 = str(signature_class_2.item())
     result = ""
     similarity_score = -1
-    if app_img and device_img:
+    if isinstance(app_img, NoneType) and isinstance(device_img, NoneType):
         if (
             config["sig_config"]["similarity_response"][signature_class_1] != config["sig_config"]["success_case"]
             and config["sig_config"]["similarity_response"][signature_class_2] != config["sig_config"]["success_case"]
@@ -242,7 +243,7 @@ def compare_sig(app_img, device_img):
                 result = config["sig_config"]["fail_case"]
             else:
                 result = config["sig_config"]["unknown_case"]
-    elif app_img or device_img:
+    elif isinstance(app_img, NoneType) or isinstance(device_img, NoneType):
         result = (
             app_img
             and config["sig_config"]["similarity_response"][signature_class_1]
