@@ -159,7 +159,7 @@ def extract_signature(file, device):
 def classify_image(img):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img = (img > 128) * 255
-    kernel = np.ones((config["thicker_kernel"], config["thicker_kernel"]), np.uint8)
+    kernel = np.ones((config["sig_config"]["thicker_kernel"], config["sig_config"]["thicker_kernel"]), np.uint8)
     img = np.uint8(img)
     erosion = cv2.erode(img, kernel, iterations=1)
     number_of_white_pix = np.sum(erosion == 255)
