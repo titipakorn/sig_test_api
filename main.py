@@ -164,7 +164,7 @@ def classify_image(img):
     erosion = cv2.erode(img, kernel, iterations=1)
     number_of_white_pix = np.sum(erosion == 255)
     number_of_black_pix = np.sum(erosion == 0)
-    return classify_model.predict([[number_of_white_pix, number_of_black_pix, number_of_black_pix / len(img)]])
+    return classify_model.predict([[number_of_white_pix, number_of_black_pix, number_of_black_pix / len(img)]])[0]
 
 
 def center_image(pil_image):
@@ -306,7 +306,7 @@ async def signature_compute(file: UploadFile = File(...)):
     img = cv2.imdecode(np.fromstring(file.file.read(), np.uint8), cv2.IMREAD_UNCHANGED)
     response = classify_image(img)
     file.file.close()
-    return {"status": response[0]}
+    return {"status": response}
 
 
 @app.post("/extract_signature")
